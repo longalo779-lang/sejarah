@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { BookOpen, Upload, Download, Trash2, Search, X, FileText } from 'lucide-react'
-import { TINGKAT_OPTIONS, SEMESTER_OPTIONS, getKelasOptions, getMapelOptions } from '@/lib/constants'
+import { TINGKAT_OPTIONS, SEMESTER_OPTIONS, TP_OPTIONS, getKelasOptions, getMapelOptions } from '@/lib/constants'
 
 interface MateriItem {
     id: string; judul: string; deskripsi: string | null
     file_url: string; file_name: string
     tingkat: number; nama_kelas: string; mapel: string
-    semester: string; created_at: string
+    semester: string; tp: string | null; created_at: string
 }
 
 export default function GuruMateriPage() {
@@ -20,6 +20,7 @@ export default function GuruMateriPage() {
     const [filterKelas, setFilterKelas] = useState('')
     const [filterMapel, setFilterMapel] = useState('')
     const [filterSemester, setFilterSemester] = useState('Ganjil')
+    const [filterTp, setFilterTp] = useState('')
     const [search, setSearch] = useState('')
 
     // Form state
@@ -29,6 +30,7 @@ export default function GuruMateriPage() {
     const [namaKelas, setNamaKelas] = useState('X 1')
     const [mapel, setMapel] = useState('Sejarah')
     const [semester, setSemester] = useState('Ganjil')
+    const [tp, setTp] = useState('TP1')
     const [file, setFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
     const [dragOver, setDragOver] = useState(false)
@@ -42,12 +44,13 @@ export default function GuruMateriPage() {
             .order('created_at', { ascending: false })
         if (filterKelas) query = query.eq('nama_kelas', filterKelas)
         if (filterMapel) query = query.eq('mapel', filterMapel)
+        if (filterTp) query = query.eq('tp', filterTp)
         const { data } = await query
         setMateriList(data || [])
         setLoading(false)
     }
 
-    useEffect(() => { fetchMateri() }, [filterTingkat, filterKelas, filterMapel, filterSemester])
+    useEffect(() => { fetchMateri() }, [filterTingkat, filterKelas, filterMapel, filterSemester, filterTp])
 
     const handleTingkatChange = (val: number) => {
         setTingkat(val)
@@ -72,7 +75,7 @@ export default function GuruMateriPage() {
                 judul, deskripsi: deskripsi || null,
                 file_url: publicUrl, file_name: file.name,
                 tingkat, nama_kelas: namaKelas,
-                mapel, semester, created_by: user.id,
+                mapel, semester, tp, created_by: user.id,
             })
 
             setShowModal(false)
@@ -147,6 +150,14 @@ export default function GuruMateriPage() {
                             {SEMESTER_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                     </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: '100px', marginBottom: 0 }}>
+                        <label className="form-label">TP</label>
+                        <select className="form-select" value={filterTp}
+                            onChange={(e) => setFilterTp(e.target.value)}>
+                            <option value="">Semua</option>
+                            {TP_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                    </div>
                     <div className="form-group" style={{ flex: 2, minWidth: '180px', marginBottom: 0 }}>
                         <label className="form-label">Cari</label>
                         <div style={{ position: 'relative' }}>
@@ -177,6 +188,7 @@ export default function GuruMateriPage() {
                                     <span className="badge badge-primary">{m.nama_kelas}</span>
                                     <span className="badge badge-info">{m.mapel}</span>
                                     <span className="badge badge-warning">Smt {m.semester}</span>
+                                    {m.tp && <span className="badge badge-success">{m.tp}</span>}
                                 </div>
                             </div>
                             {m.deskripsi && <p style={{ fontSize: '0.85rem', color: 'var(--neutral-500)', marginBottom: '0.75rem' }}>{m.deskripsi}</p>}
@@ -198,7 +210,7 @@ export default function GuruMateriPage() {
 
             {/* Upload Modal */}
             {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay">
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2>Upload Materi Baru</h2>
@@ -246,6 +258,13 @@ export default function GuruMateriPage() {
                                         {SEMESTER_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                     </select>
                                 </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Tujuan Pembelajaran</label>
+                                <select className="form-select" value={tp}
+                                    onChange={(e) => setTp(e.target.value)}>
+                                    {TP_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                </select>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">File</label>

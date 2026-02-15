@@ -53,14 +53,13 @@ export default function GuruDokumenPage() {
             .eq('semester', filterSemester)
             .eq('tahun_ajaran', filterTahunAjaran)
             .order('created_at', { ascending: false })
-        if (filterKelas) query = query.eq('nama_kelas', filterKelas)
         if (filterMapel) query = query.eq('mapel', filterMapel)
         const { data } = await query
         setDokumenList(data || [])
         setLoading(false)
     }
 
-    useEffect(() => { fetchDokumen() }, [activeTab, filterTingkat, filterKelas, filterMapel, filterSemester, filterTahunAjaran])
+    useEffect(() => { fetchDokumen() }, [activeTab, filterTingkat, filterMapel, filterSemester, filterTahunAjaran])
 
     const handleTingkatChange = (val: number) => {
         setTingkat(val)
@@ -81,7 +80,7 @@ export default function GuruDokumenPage() {
             await supabase.from('dokumen_guru').insert({
                 judul, tipe: activeTab,
                 file_url: publicUrl, file_name: file.name,
-                tingkat, nama_kelas: namaKelas,
+                tingkat,
                 mapel, semester, tahun_ajaran: tahunAjaran,
                 created_by: user.id,
             })
@@ -154,14 +153,6 @@ export default function GuruDokumenPage() {
                         </select>
                     </div>
                     <div className="form-group" style={{ flex: 1, minWidth: '100px', marginBottom: 0 }}>
-                        <label className="form-label">Kelas</label>
-                        <select className="form-select" value={filterKelas}
-                            onChange={(e) => setFilterKelas(e.target.value)}>
-                            <option value="">Semua</option>
-                            {getKelasOptions(filterTingkat).map(k => <option key={k} value={k}>{k}</option>)}
-                        </select>
-                    </div>
-                    <div className="form-group" style={{ flex: 1, minWidth: '100px', marginBottom: 0 }}>
                         <label className="form-label">Mapel</label>
                         <select className="form-select" value={filterMapel}
                             onChange={(e) => setFilterMapel(e.target.value)}>
@@ -225,7 +216,7 @@ export default function GuruDokumenPage() {
 
             {/* Upload Modal */}
             {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay">
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2>Upload {currentTabInfo.label}</h2>
@@ -246,21 +237,14 @@ export default function GuruDokumenPage() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Kelas</label>
-                                    <select className="form-select" value={namaKelas}
-                                        onChange={(e) => setNamaKelas(e.target.value)}>
-                                        {getKelasOptions(tingkat).map(k => <option key={k} value={k}>{k}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                <div className="form-group">
                                     <label className="form-label">Mata Pelajaran</label>
                                     <select className="form-select" value={mapel}
                                         onChange={(e) => setMapel(e.target.value)}>
                                         {getMapelOptions(tingkat).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                     </select>
                                 </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                                 <div className="form-group">
                                     <label className="form-label">Semester</label>
                                     <select className="form-select" value={semester}
@@ -268,13 +252,13 @@ export default function GuruDokumenPage() {
                                         {SEMESTER_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                     </select>
                                 </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Tahun Ajaran</label>
-                                <select className="form-select" value={tahunAjaran}
-                                    onChange={(e) => setTahunAjaran(e.target.value)}>
-                                    {TAHUN_AJARAN_OPTIONS.map(ta => <option key={ta} value={ta}>{ta}</option>)}
-                                </select>
+                                <div className="form-group">
+                                    <label className="form-label">Tahun Ajaran</label>
+                                    <select className="form-select" value={tahunAjaran}
+                                        onChange={(e) => setTahunAjaran(e.target.value)}>
+                                        {TAHUN_AJARAN_OPTIONS.map(ta => <option key={ta} value={ta}>{ta}</option>)}
+                                    </select>
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">File</label>

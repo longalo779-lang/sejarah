@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Award, TrendingUp, BookOpen } from 'lucide-react'
-import { SEMESTER_OPTIONS, getMapelOptions } from '@/lib/constants'
+import { SEMESTER_OPTIONS, TP_OPTIONS, getMapelOptions } from '@/lib/constants'
 
 interface NilaiItem {
     id: string; mapel: string; semester: string
     kategori: string; judul: string; nilai: number
     keterangan: string | null; created_at: string
+    tingkat?: number; nama_kelas?: string; tp?: string | null
     guru?: { nama: string; avatar_url: string | null }
 }
 
@@ -18,6 +19,7 @@ export default function SiswaNilaiPage() {
     const [filterSemester, setFilterSemester] = useState('Ganjil')
     const [filterMapel, setFilterMapel] = useState('')
     const [filterKategori, setFilterKategori] = useState('')
+    const [filterTp, setFilterTp] = useState('')
     const [namaKelas, setNamaKelas] = useState('')
     const [tingkat, setTingkat] = useState(10)
 
@@ -42,12 +44,13 @@ export default function SiswaNilaiPage() {
                 .order('created_at', { ascending: false })
             if (filterMapel) query = query.eq('mapel', filterMapel)
             if (filterKategori) query = query.eq('kategori', filterKategori)
+            if (filterTp) query = query.eq('tp', filterTp)
             const { data } = await query
             setNilaiList(data || [])
             setLoading(false)
         }
         fetchData()
-    }, [filterSemester, filterMapel, filterKategori])
+    }, [filterSemester, filterMapel, filterKategori, filterTp])
 
     const avg = nilaiList.length > 0
         ? (nilaiList.reduce((a, b) => a + b.nilai, 0) / nilaiList.length).toFixed(1)
@@ -108,6 +111,14 @@ export default function SiswaNilaiPage() {
                             <option value="Praktik">Praktik</option>
                         </select>
                     </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: '100px', marginBottom: 0 }}>
+                        <label className="form-label">TP</label>
+                        <select className="form-select" value={filterTp}
+                            onChange={(e) => setFilterTp(e.target.value)}>
+                            <option value="">Semua</option>
+                            {TP_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -152,9 +163,10 @@ export default function SiswaNilaiPage() {
                                 <th>Mapel</th>
                                 <th>Kategori</th>
                                 <th>Judul</th>
+                                <th>Kelas</th>
+                                <th>TP</th>
                                 <th>Nilai</th>
                                 <th>Guru</th>
-                                <th>Keterangan</th>
                                 <th>Tanggal</th>
                             </tr>
                         </thead>
@@ -164,6 +176,8 @@ export default function SiswaNilaiPage() {
                                     <td><span className="badge badge-info">{n.mapel}</span></td>
                                     <td>{n.kategori}</td>
                                     <td>{n.judul}</td>
+                                    <td>{n.nama_kelas || namaKelas}</td>
+                                    <td>{n.tp ? <span className="badge badge-success">{n.tp}</span> : '-'}</td>
                                     <td><span className={`badge ${getNilaiBadge(n.nilai)}`}>{n.nilai}</span></td>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -183,7 +197,6 @@ export default function SiswaNilaiPage() {
                                             <span style={{ fontSize: '0.8rem' }}>{n.guru?.nama || 'Guru'}</span>
                                         </div>
                                     </td>
-                                    <td style={{ fontSize: '0.85rem' }}>{n.keterangan || getFeedback(n.nilai)}</td>
                                     <td style={{ fontSize: '0.8rem', color: 'var(--neutral-400)' }}>
                                         {new Date(n.created_at).toLocaleDateString('id-ID')}
                                     </td>

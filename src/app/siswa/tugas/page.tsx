@@ -25,6 +25,7 @@ export default function SiswaTugasPage() {
     const [catatan, setCatatan] = useState('')
     const [uploading, setUploading] = useState(false)
     const [filterMapel, setFilterMapel] = useState('')
+    const [filterKategori, setFilterKategori] = useState('')
     const [now, setNow] = useState(new Date())
     const [tingkat, setTingkat] = useState(10)
 
@@ -44,6 +45,7 @@ export default function SiswaTugasPage() {
             .eq('nama_kelas', profile.nama_kelas)
             .order('deadline', { ascending: true })
         if (filterMapel) query = query.eq('mapel', filterMapel)
+        if (filterKategori) query = query.eq('kategori', filterKategori)
         const { data: tugasData } = await query
 
         // Get submissions with checked + nilai
@@ -83,22 +85,28 @@ export default function SiswaTugasPage() {
         }
     }
 
-    const handleSubmit = async (tugasId: string) => {
-        if (!file) return
+    const handleSubmit = async (tugasId: string, fileRequired: boolean = true) => {
+        if (fileRequired && !file) return
         setUploading(true)
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
 
-            const filePath = `${user.id}/${Date.now()}_${file.name}`
-            const { error } = await supabase.storage.from('submissions').upload(filePath, file)
-            if (error) throw error
+            let fileUrl = ''
+            let fileName = 'Tanpa file'
 
-            const { data: { publicUrl } } = supabase.storage.from('submissions').getPublicUrl(filePath)
+            if (file) {
+                const filePath = `${user.id}/${Date.now()}_${file.name}`
+                const { error } = await supabase.storage.from('submissions').upload(filePath, file)
+                if (error) throw error
+                const { data: { publicUrl } } = supabase.storage.from('submissions').getPublicUrl(filePath)
+                fileUrl = publicUrl
+                fileName = file.name
+            }
 
             await supabase.from('tugas_submissions').insert({
                 tugas_id: tugasId, siswa_id: user.id,
-                file_url: publicUrl, file_name: file.name,
+                file_url: fileUrl, file_name: fileName,
                 catatan: catatan || null,
             })
 
@@ -107,6 +115,27 @@ export default function SiswaTugasPage() {
         } catch (err) {
             console.error('Submit error:', err)
             alert('Gagal mengirim tugas')
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    const handleConfirm = async (tugasId: string) => {
+        setUploading(true)
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            await supabase.from('tugas_submissions').insert({
+                tugas_id: tugasId, siswa_id: user.id,
+                file_url: '', file_name: 'Konfirmasi Selesai',
+                catatan: 'Siswa mengonfirmasi telah menyelesaikan',
+            })
+
+            fetchTugas()
+        } catch (err) {
+            console.error('Confirm error:', err)
+            alert('Gagal mengonfirmasi')
         } finally {
             setUploading(false)
         }
@@ -129,13 +158,27 @@ export default function SiswaTugasPage() {
             </div>
 
             <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <div className="form-group" style={{ marginBottom: 0, maxWidth: '200px' }}>
-                    <label className="form-label">Mapel</label>
-                    <select className="form-select" value={filterMapel}
-                        onChange={(e) => setFilterMapel(e.target.value)}>
-                        {tingkat > 10 && <option value="">Semua</option>}
-                        {getMapelOptions(tingkat).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'end' }}>
+                    <div className="form-group" style={{ flex: 1, minWidth: '120px', marginBottom: 0 }}>
+                        <label className="form-label">Mapel</label>
+                        <select className="form-select" value={filterMapel}
+                            onChange={(e) => setFilterMapel(e.target.value)}>
+                            {tingkat > 10 && <option value="">Semua</option>}
+                            {getMapelOptions(tingkat).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: '120px', marginBottom: 0 }}>
+                        <label className="form-label">Kategori</label>
+                        <select className="form-select" value={filterKategori}
+                            onChange={(e) => setFilterKategori(e.target.value)}>
+                            <option value="">Semua</option>
+                            <option value="Tugas">Tugas</option>
+                            <option value="Ulangan Harian">Ulangan Harian</option>
+                            <option value="UTS">UTS</option>
+                            <option value="UAS">UAS</option>
+                            <option value="Praktik">Praktik</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -157,6 +200,9 @@ export default function SiswaTugasPage() {
                                         <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--secondary-800)', marginBottom: '0.5rem' }}>{t.judul}</h3>
                                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
                                             <span className="badge badge-info">{t.mapel}</span>
+                                            {(t as any).semester && <span className="badge badge-warning">Smt {(t as any).semester}</span>}
+                                            {(t as any).tp && <span className="badge badge-success">{(t as any).tp}</span>}
+                                            {(t as any).kategori && <span className="badge" style={{ background: 'var(--secondary-100)', color: 'var(--secondary-700)' }}>{(t as any).kategori}</span>}
                                             {t.submitted ? (
                                                 <>
                                                     <span className="badge badge-success"><CheckCircle2 size={12} /> Sudah dikumpulkan</span>
@@ -216,16 +262,24 @@ export default function SiswaTugasPage() {
                                         </p>
                                     </div>
                                     {!t.submitted && !countdown.expired && (
-                                        <button className="btn btn-primary" onClick={() => setShowUpload(t.id)}>
-                                            <Upload size={14} /> Kumpulkan
-                                        </button>
+                                        (t as any).kategori === 'UTS' || (t as any).kategori === 'UAS' || (t as any).kategori === 'Praktik' ? (
+                                            <button className="btn btn-primary" onClick={() => handleConfirm(t.id)} disabled={uploading}>
+                                                <CheckCircle2 size={14} /> {uploading ? 'Mengonfirmasi...' : 'Konfirmasi Selesai'}
+                                            </button>
+                                        ) : (
+                                            <button className="btn btn-primary" onClick={() => setShowUpload(t.id)}>
+                                                <Upload size={14} /> Kumpulkan
+                                            </button>
+                                        )
                                     )}
                                 </div>
 
-                                {showUpload === t.id && (
+                                {showUpload === t.id && (t as any).kategori !== 'UTS' && (t as any).kategori !== 'UAS' && (t as any).kategori !== 'Praktik' && (
                                     <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--neutral-50)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--neutral-200)' }}>
                                         <div className="form-group">
-                                            <label className="form-label">File Tugas</label>
+                                            <label className="form-label">
+                                                {(t as any).kategori === 'Ulangan Harian' ? 'File Ulangan (opsional)' : 'File Tugas'}
+                                            </label>
                                             {file ? (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                     <FileText size={18} /> <span>{file.name}</span>
@@ -245,8 +299,10 @@ export default function SiswaTugasPage() {
                                         </div>
                                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'end' }}>
                                             <button className="btn btn-outline" onClick={() => { setShowUpload(null); setFile(null); setCatatan('') }}>Batal</button>
-                                            <button className="btn btn-primary" onClick={() => handleSubmit(t.id)} disabled={uploading || !file}>
-                                                {uploading ? 'Mengirim...' : 'Kirim Tugas'}
+                                            <button className="btn btn-primary"
+                                                onClick={() => handleSubmit(t.id, (t as any).kategori !== 'Ulangan Harian')}
+                                                disabled={uploading || ((t as any).kategori !== 'Ulangan Harian' && !file)}>
+                                                {uploading ? 'Mengirim...' : (t as any).kategori === 'Ulangan Harian' ? 'Kirim' : 'Kirim Tugas'}
                                             </button>
                                         </div>
                                     </div>

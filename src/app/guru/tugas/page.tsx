@@ -3,15 +3,23 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ClipboardList, Plus, Trash2, X, Upload, FileText, Clock, Users, Download, CheckCircle2, Circle, Save } from 'lucide-react'
-import { TINGKAT_OPTIONS, SEMESTER_OPTIONS, getKelasOptions, getMapelOptions } from '@/lib/constants'
+import { TINGKAT_OPTIONS, SEMESTER_OPTIONS, TP_OPTIONS, getKelasOptions, getMapelOptions } from '@/lib/constants'
 
 interface TugasItem {
     id: string; judul: string; deskripsi: string | null
     file_url: string | null; file_name: string | null
     tingkat: number; nama_kelas: string; mapel: string
-    semester: string; deadline: string; created_at: string
+    semester: string; tp: string | null; kategori: string; deadline: string; created_at: string
     submissionCount?: number
 }
+
+const KATEGORI_OPTIONS = [
+    { value: 'Tugas', label: 'Tugas' },
+    { value: 'Ulangan Harian', label: 'Ulangan Harian' },
+    { value: 'UTS', label: 'UTS' },
+    { value: 'UAS', label: 'UAS' },
+    { value: 'Praktik', label: 'Praktik' },
+]
 
 interface Submission {
     id: string; file_url: string; file_name: string
@@ -28,10 +36,13 @@ export default function GuruTugasPage() {
     const [showSubmissions, setShowSubmissions] = useState<string | null>(null)
     const [selectedTugas, setSelectedTugas] = useState<TugasItem | null>(null)
     const [submissions, setSubmissions] = useState<Submission[]>([])
+
     const [filterTingkat, setFilterTingkat] = useState<number>(10)
     const [filterKelas, setFilterKelas] = useState('')
     const [filterMapel, setFilterMapel] = useState('')
     const [filterSemester, setFilterSemester] = useState('Ganjil')
+    const [filterTp, setFilterTp] = useState('')
+    const [filterKategori, setFilterKategori] = useState('')
 
     // Inline grading state per submission id
     const [gradeInputs, setGradeInputs] = useState<Record<string, string>>({})
@@ -44,8 +55,15 @@ export default function GuruTugasPage() {
     const [namaKelas, setNamaKelas] = useState('X 1')
     const [mapel, setMapel] = useState('Sejarah')
     const [semester, setSemester] = useState('Ganjil')
-    const [deadlineDays, setDeadlineDays] = useState(7)
-    const [deadlineHours, setDeadlineHours] = useState(0)
+    const [tp, setTp] = useState('TP1')
+    const [formKategori, setFormKategori] = useState('Tugas')
+    const getDefaultDeadline = () => {
+        const d = new Date()
+        d.setDate(d.getDate() + 7)
+        d.setMinutes(0, 0, 0)
+        return d.toISOString().slice(0, 16)
+    }
+    const [deadlineStr, setDeadlineStr] = useState(getDefaultDeadline())
     const [file, setFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
 
@@ -58,6 +76,8 @@ export default function GuruTugasPage() {
             .order('created_at', { ascending: false })
         if (filterKelas) query = query.eq('nama_kelas', filterKelas)
         if (filterMapel) query = query.eq('mapel', filterMapel)
+        if (filterTp) query = query.eq('tp', filterTp)
+        if (filterKategori) query = query.eq('kategori', filterKategori)
         const { data } = await query
 
         if (data && data.length > 0) {
@@ -66,6 +86,7 @@ export default function GuruTugasPage() {
                 .from('tugas_submissions')
                 .select('tugas_id')
                 .in('tugas_id', tugasIds)
+                .eq('checked', false)
 
             const countMap: Record<string, number> = {}
             subCounts?.forEach(s => {
@@ -93,7 +114,7 @@ export default function GuruTugasPage() {
         setShowSubmissions(tugas.id)
     }
 
-    useEffect(() => { fetchTugas() }, [filterTingkat, filterKelas, filterMapel, filterSemester])
+    useEffect(() => { fetchTugas() }, [filterTingkat, filterKelas, filterMapel, filterSemester, filterTp, filterKategori])
 
     const handleTingkatChange = (val: number) => {
         setTingkat(val)
@@ -117,21 +138,19 @@ export default function GuruTugasPage() {
                 fileUrl = publicUrl; fileName = file.name
             }
 
-            const deadline = new Date()
-            deadline.setDate(deadline.getDate() + deadlineDays)
-            deadline.setHours(deadline.getHours() + deadlineHours)
+            const deadline = new Date(deadlineStr)
 
             await supabase.from('tugas').insert({
                 judul, deskripsi: deskripsi || null,
                 file_url: fileUrl, file_name: fileName,
                 tingkat, nama_kelas: namaKelas,
-                mapel, semester, deadline: deadline.toISOString(),
+                mapel, semester, tp, kategori: formKategori, deadline: deadline.toISOString(),
                 created_by: user.id,
             })
 
             setShowModal(false)
-            setJudul(''); setDeskripsi(''); setFile(null)
-            setDeadlineDays(7); setDeadlineHours(0)
+            setJudul(''); setDeskripsi(''); setFile(null); setFormKategori('Tugas')
+            setDeadlineStr(getDefaultDeadline())
             fetchTugas()
         } catch (err) {
             console.error('Create error:', err)
@@ -185,7 +204,7 @@ export default function GuruTugasPage() {
                 .select('id')
                 .eq('siswa_id', sub.siswa_id)
                 .eq('judul', selectedTugas.judul)
-                .eq('kategori', 'Tugas')
+                .eq('kategori', selectedTugas.kategori || 'Tugas')
                 .eq('mapel', selectedTugas.mapel)
                 .eq('semester', selectedTugas.semester)
                 .maybeSingle()
@@ -199,10 +218,11 @@ export default function GuruTugasPage() {
                     nama_kelas: sub.profiles?.nama_kelas || selectedTugas.nama_kelas,
                     mapel: selectedTugas.mapel,
                     semester: selectedTugas.semester,
-                    kategori: 'Tugas',
+                    kategori: selectedTugas.kategori || 'Tugas',
                     judul: selectedTugas.judul,
                     nilai: val,
-                    keterangan: `Nilai tugas: ${selectedTugas.judul}`,
+                    tp: selectedTugas.tp || null,
+                    keterangan: `Nilai ${selectedTugas.kategori || 'Tugas'}: ${selectedTugas.judul}`,
                     created_by: user.id,
                 })
             }
@@ -269,6 +289,22 @@ export default function GuruTugasPage() {
                             {SEMESTER_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                     </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: '100px', marginBottom: 0 }}>
+                        <label className="form-label">TP</label>
+                        <select className="form-select" value={filterTp}
+                            onChange={(e) => setFilterTp(e.target.value)}>
+                            <option value="">Semua</option>
+                            {TP_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: '120px', marginBottom: 0 }}>
+                        <label className="form-label">Kategori</label>
+                        <select className="form-select" value={filterKategori}
+                            onChange={(e) => setFilterKategori(e.target.value)}>
+                            <option value="">Semua</option>
+                            {KATEGORI_OPTIONS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -291,6 +327,8 @@ export default function GuruTugasPage() {
                                         <span className="badge badge-primary">{t.nama_kelas}</span>
                                         <span className="badge badge-info">{t.mapel}</span>
                                         <span className="badge badge-warning">Smt {t.semester}</span>
+                                        {t.tp && <span className="badge badge-success">{t.tp}</span>}
+                                        <span className="badge" style={{ background: 'var(--secondary-100)', color: 'var(--secondary-700)' }}>{t.kategori}</span>
                                         <span className={`badge ${isExpired(t.deadline) ? 'badge-danger' : 'badge-success'}`}>
                                             <Clock size={12} /> {isExpired(t.deadline) ? 'Expired' : 'Aktif'}
                                         </span>
@@ -327,208 +365,232 @@ export default function GuruTugasPage() {
                 </div>
             )}
 
+
             {/* Create Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Buat Tugas Baru</h2>
-                            <button className="btn btn-ghost" onClick={() => setShowModal(false)}><X size={20} /></button>
+            {
+                showModal && (
+                    <div className="modal-overlay">
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h2>Buat Tugas Baru</h2>
+                                <button className="btn btn-ghost" onClick={() => setShowModal(false)}><X size={20} /></button>
+                            </div>
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label className="form-label">Judul Tugas</label>
+                                    <input className="form-input" placeholder="Masukkan judul tugas"
+                                        value={judul} onChange={(e) => setJudul(e.target.value)} />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Deskripsi</label>
+                                    <textarea className="form-input" placeholder="Deskripsi tugas (opsional)"
+                                        value={deskripsi} onChange={(e) => setDeskripsi(e.target.value)} rows={3} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Tingkat</label>
+                                        <select className="form-select" value={tingkat}
+                                            onChange={(e) => handleTingkatChange(Number(e.target.value))}>
+                                            {TINGKAT_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Kelas</label>
+                                        <select className="form-select" value={namaKelas}
+                                            onChange={(e) => setNamaKelas(e.target.value)}>
+                                            {getKelasOptions(tingkat).map(k => <option key={k} value={k}>{k}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Mata Pelajaran</label>
+                                        <select className="form-select" value={mapel}
+                                            onChange={(e) => setMapel(e.target.value)}>
+                                            {getMapelOptions(tingkat).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Semester</label>
+                                        <select className="form-select" value={semester}
+                                            onChange={(e) => setSemester(e.target.value)}>
+                                            {SEMESTER_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Tujuan Pembelajaran</label>
+                                        <select className="form-select" value={tp}
+                                            onChange={(e) => setTp(e.target.value)}>
+                                            {TP_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Kategori</label>
+                                        <select className="form-select" value={formKategori}
+                                            onChange={(e) => setFormKategori(e.target.value)}>
+                                            {KATEGORI_OPTIONS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Deadline</label>
+                                    <input type="datetime-local" className="form-input"
+                                        value={deadlineStr}
+                                        min={new Date().toISOString().slice(0, 16)}
+                                        onChange={(e) => setDeadlineStr(e.target.value)} />
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--neutral-400)', marginTop: '0.25rem' }}>
+                                        Pilih tanggal dan jam batas pengumpulan
+                                    </p>
+                                </div>
+                                {(formKategori === 'Tugas' || formKategori === 'Ulangan Harian') && (
+                                    <div className="form-group">
+                                        <label className="form-label">File Lampiran (opsional)</label>
+                                        {file ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', background: 'var(--neutral-50)', borderRadius: 'var(--radius-sm)' }}>
+                                                <FileText size={18} /> <span style={{ flex: 1 }}>{file.name}</span>
+                                                <button className="btn btn-ghost" onClick={() => setFile(null)}><X size={16} /></button>
+                                            </div>
+                                        ) : (
+                                            <label className="btn btn-outline btn-block" style={{ cursor: 'pointer' }}>
+                                                <Upload size={16} /> Pilih File
+                                                <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                                            </label>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
+                                <button className="btn btn-primary" onClick={handleCreate} disabled={uploading || !judul}>
+                                    {uploading ? <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Menyimpan...</> : <><Plus size={16} /> Buat Tugas</>}
+                                </button>
+                            </div>
                         </div>
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label className="form-label">Judul Tugas</label>
-                                <input className="form-input" placeholder="Masukkan judul tugas"
-                                    value={judul} onChange={(e) => setJudul(e.target.value)} />
+                    </div>
+                )
+            }
+
+            {/* Submissions Modal with Check & Grade */}
+            {
+                showSubmissions && (
+                    <div className="modal-overlay">
+                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '850px' }}>
+                            <div className="modal-header">
+                                <div>
+                                    <h2>Daftar Pengumpulan Tugas</h2>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--neutral-500)', marginTop: '0.25rem' }}>
+                                        {selectedTugas?.judul} • {submissions.length} siswa mengumpulkan
+                                    </p>
+                                </div>
+                                <button className="btn btn-ghost" onClick={() => setShowSubmissions(null)}><X size={20} /></button>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">Deskripsi</label>
-                                <textarea className="form-input" placeholder="Deskripsi tugas (opsional)"
-                                    value={deskripsi} onChange={(e) => setDeskripsi(e.target.value)} rows={3} />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Tingkat</label>
-                                    <select className="form-select" value={tingkat}
-                                        onChange={(e) => handleTingkatChange(Number(e.target.value))}>
-                                        {TINGKAT_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Kelas</label>
-                                    <select className="form-select" value={namaKelas}
-                                        onChange={(e) => setNamaKelas(e.target.value)}>
-                                        {getKelasOptions(tingkat).map(k => <option key={k} value={k}>{k}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Mata Pelajaran</label>
-                                    <select className="form-select" value={mapel}
-                                        onChange={(e) => setMapel(e.target.value)}>
-                                        {getMapelOptions(tingkat).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Semester</label>
-                                    <select className="form-select" value={semester}
-                                        onChange={(e) => setSemester(e.target.value)}>
-                                        {SEMESTER_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                <div className="form-group">
-                                    <label className="form-label">Deadline (Hari)</label>
-                                    <input type="number" className="form-input" min={0} value={deadlineDays}
-                                        onChange={(e) => setDeadlineDays(Number(e.target.value))} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Deadline (Jam)</label>
-                                    <input type="number" className="form-input" min={0} max={23} value={deadlineHours}
-                                        onChange={(e) => setDeadlineHours(Number(e.target.value))} />
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">File Lampiran (opsional)</label>
-                                {file ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', background: 'var(--neutral-50)', borderRadius: 'var(--radius-sm)' }}>
-                                        <FileText size={18} /> <span style={{ flex: 1 }}>{file.name}</span>
-                                        <button className="btn btn-ghost" onClick={() => setFile(null)}><X size={16} /></button>
+                            <div className="modal-body">
+                                {submissions.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                        <Users size={48} style={{ color: 'var(--neutral-300)', marginBottom: '1rem' }} />
+                                        <p style={{ color: 'var(--neutral-500)' }}>Belum ada siswa yang mengumpulkan tugas</p>
                                     </div>
                                 ) : (
-                                    <label className="btn btn-outline btn-block" style={{ cursor: 'pointer' }}>
-                                        <Upload size={16} /> Pilih File
-                                        <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                                    </label>
+                                    <div style={{ display: 'grid', gap: '1.25rem' }}>
+                                        {Object.entries(groupedSubmissions).map(([kelas, subs]) => (
+                                            <div key={kelas}>
+                                                <div style={{
+                                                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                                    marginBottom: '0.75rem', paddingBottom: '0.5rem',
+                                                    borderBottom: '2px solid var(--primary-100)'
+                                                }}>
+                                                    <span className="badge badge-primary" style={{ fontSize: '0.8rem' }}>{kelas}</span>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--neutral-400)' }}>
+                                                        {subs.length} siswa
+                                                    </span>
+                                                </div>
+                                                <div style={{ overflowX: 'auto' }}>
+                                                    <table className="table" style={{ fontSize: '0.85rem' }}>
+                                                        <thead>
+                                                            <tr>
+                                                                <th style={{ width: '30px' }}>No</th>
+                                                                <th>Nama Siswa</th>
+                                                                <th>Tanggal</th>
+                                                                <th>Jam</th>
+                                                                <th>File</th>
+                                                                <th style={{ width: '80px', textAlign: 'center' }}>Periksa</th>
+                                                                <th style={{ width: '130px', textAlign: 'center' }}>Nilai (0-100)</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {subs.map((s, idx) => {
+                                                                const dt = new Date(s.submitted_at)
+                                                                return (
+                                                                    <tr key={s.id} style={{ background: s.checked ? 'var(--success-light)' : undefined }}>
+                                                                        <td>{idx + 1}</td>
+                                                                        <td style={{ fontWeight: 500 }}>
+                                                                            {s.profiles?.nama || 'Siswa'}
+                                                                            {s.catatan && (
+                                                                                <p style={{ fontSize: '0.75rem', color: 'var(--neutral-400)', margin: '0.15rem 0 0' }}>
+                                                                                    💬 {s.catatan}
+                                                                                </p>
+                                                                            )}
+                                                                        </td>
+                                                                        <td style={{ whiteSpace: 'nowrap' }}>{dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                                                        <td style={{ whiteSpace: 'nowrap' }}>{dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
+                                                                        <td>
+                                                                            {s.file_url && s.file_url !== '' ? (
+                                                                                <a href={s.file_url} target="_blank" rel="noreferrer"
+                                                                                    className="btn btn-outline" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem' }}>
+                                                                                    <Download size={11} /> Download
+                                                                                </a>
+                                                                            ) : (
+                                                                                <span style={{ fontSize: '0.75rem', color: 'var(--neutral-400)' }}>Tanpa file</span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td style={{ textAlign: 'center' }}>
+                                                                            <button
+                                                                                className={`btn ${s.checked ? 'btn-primary' : 'btn-outline'}`}
+                                                                                style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }}
+                                                                                onClick={() => handleToggleChecked(s)}
+                                                                                disabled={saving[s.id]}
+                                                                                title={s.checked ? 'Sudah diperiksa' : 'Tandai sudah diperiksa'}
+                                                                            >
+                                                                                {s.checked ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                                                                            </button>
+                                                                        </td>
+                                                                        <td>
+                                                                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                                                                                <input
+                                                                                    type="number" min={0} max={100}
+                                                                                    className="form-input"
+                                                                                    style={{ width: '65px', padding: '0.25rem 0.4rem', fontSize: '0.85rem', textAlign: 'center' }}
+                                                                                    placeholder="0-100"
+                                                                                    value={gradeInputs[s.id] ?? ''}
+                                                                                    onChange={(e) => setGradeInputs(prev => ({ ...prev, [s.id]: e.target.value }))}
+                                                                                />
+                                                                                <button
+                                                                                    className="btn btn-primary"
+                                                                                    style={{ padding: '0.3rem 0.4rem', fontSize: '0.7rem' }}
+                                                                                    onClick={() => handleSaveGrade(s)}
+                                                                                    disabled={saving[s.id] || !gradeInputs[s.id]}
+                                                                                    title="Simpan Nilai"
+                                                                                >
+                                                                                    <Save size={14} />
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                )
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
                         </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-outline" onClick={() => setShowModal(false)}>Batal</button>
-                            <button className="btn btn-primary" onClick={handleCreate} disabled={uploading || !judul}>
-                                {uploading ? <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Menyimpan...</> : <><Plus size={16} /> Buat Tugas</>}
-                            </button>
-                        </div>
                     </div>
-                </div>
-            )}
-
-            {/* Submissions Modal with Check & Grade */}
-            {showSubmissions && (
-                <div className="modal-overlay" onClick={() => setShowSubmissions(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '850px' }}>
-                        <div className="modal-header">
-                            <div>
-                                <h2>Daftar Pengumpulan Tugas</h2>
-                                <p style={{ fontSize: '0.85rem', color: 'var(--neutral-500)', marginTop: '0.25rem' }}>
-                                    {selectedTugas?.judul} • {submissions.length} siswa mengumpulkan
-                                </p>
-                            </div>
-                            <button className="btn btn-ghost" onClick={() => setShowSubmissions(null)}><X size={20} /></button>
-                        </div>
-                        <div className="modal-body">
-                            {submissions.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                                    <Users size={48} style={{ color: 'var(--neutral-300)', marginBottom: '1rem' }} />
-                                    <p style={{ color: 'var(--neutral-500)' }}>Belum ada siswa yang mengumpulkan tugas</p>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'grid', gap: '1.25rem' }}>
-                                    {Object.entries(groupedSubmissions).map(([kelas, subs]) => (
-                                        <div key={kelas}>
-                                            <div style={{
-                                                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                                marginBottom: '0.75rem', paddingBottom: '0.5rem',
-                                                borderBottom: '2px solid var(--primary-100)'
-                                            }}>
-                                                <span className="badge badge-primary" style={{ fontSize: '0.8rem' }}>{kelas}</span>
-                                                <span style={{ fontSize: '0.8rem', color: 'var(--neutral-400)' }}>
-                                                    {subs.length} siswa
-                                                </span>
-                                            </div>
-                                            <div style={{ overflowX: 'auto' }}>
-                                                <table className="table" style={{ fontSize: '0.85rem' }}>
-                                                    <thead>
-                                                        <tr>
-                                                            <th style={{ width: '30px' }}>No</th>
-                                                            <th>Nama Siswa</th>
-                                                            <th>Tanggal</th>
-                                                            <th>Jam</th>
-                                                            <th>File</th>
-                                                            <th style={{ width: '80px', textAlign: 'center' }}>Periksa</th>
-                                                            <th style={{ width: '130px', textAlign: 'center' }}>Nilai (0-100)</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {subs.map((s, idx) => {
-                                                            const dt = new Date(s.submitted_at)
-                                                            return (
-                                                                <tr key={s.id} style={{ background: s.checked ? 'var(--success-light)' : undefined }}>
-                                                                    <td>{idx + 1}</td>
-                                                                    <td style={{ fontWeight: 500 }}>
-                                                                        {s.profiles?.nama || 'Siswa'}
-                                                                        {s.catatan && (
-                                                                            <p style={{ fontSize: '0.75rem', color: 'var(--neutral-400)', margin: '0.15rem 0 0' }}>
-                                                                                💬 {s.catatan}
-                                                                            </p>
-                                                                        )}
-                                                                    </td>
-                                                                    <td style={{ whiteSpace: 'nowrap' }}>{dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                                                                    <td style={{ whiteSpace: 'nowrap' }}>{dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
-                                                                    <td>
-                                                                        <a href={s.file_url} target="_blank" rel="noreferrer"
-                                                                            className="btn btn-outline" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem' }}>
-                                                                            <Download size={11} /> Download
-                                                                        </a>
-                                                                    </td>
-                                                                    <td style={{ textAlign: 'center' }}>
-                                                                        <button
-                                                                            className={`btn ${s.checked ? 'btn-primary' : 'btn-outline'}`}
-                                                                            style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }}
-                                                                            onClick={() => handleToggleChecked(s)}
-                                                                            disabled={saving[s.id]}
-                                                                            title={s.checked ? 'Sudah diperiksa' : 'Tandai sudah diperiksa'}
-                                                                        >
-                                                                            {s.checked ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                                                                        </button>
-                                                                    </td>
-                                                                    <td>
-                                                                        <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                                                                            <input
-                                                                                type="number" min={0} max={100}
-                                                                                className="form-input"
-                                                                                style={{ width: '65px', padding: '0.25rem 0.4rem', fontSize: '0.85rem', textAlign: 'center' }}
-                                                                                placeholder="0-100"
-                                                                                value={gradeInputs[s.id] ?? ''}
-                                                                                onChange={(e) => setGradeInputs(prev => ({ ...prev, [s.id]: e.target.value }))}
-                                                                            />
-                                                                            <button
-                                                                                className="btn btn-primary"
-                                                                                style={{ padding: '0.3rem 0.4rem', fontSize: '0.7rem' }}
-                                                                                onClick={() => handleSaveGrade(s)}
-                                                                                disabled={saving[s.id] || !gradeInputs[s.id]}
-                                                                                title="Simpan Nilai"
-                                                                            >
-                                                                                <Save size={14} />
-                                                                            </button>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            )
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+                )}
         </div>
     )
 }

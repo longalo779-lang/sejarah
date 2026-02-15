@@ -47,6 +47,7 @@ CREATE TABLE materi (
   nama_kelas TEXT NOT NULL,
   mapel TEXT NOT NULL DEFAULT 'Sejarah' CHECK (mapel IN ('Sejarah', 'STL')),
   semester TEXT NOT NULL DEFAULT 'Ganjil' CHECK (semester IN ('Ganjil', 'Genap')),
+  tp TEXT CHECK (tp IN ('TP1', 'TP2', 'TP3', 'TP4')),
   created_by UUID REFERENCES profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -65,6 +66,8 @@ CREATE TABLE tugas (
   nama_kelas TEXT NOT NULL,
   mapel TEXT NOT NULL DEFAULT 'Sejarah' CHECK (mapel IN ('Sejarah', 'STL')),
   semester TEXT NOT NULL DEFAULT 'Ganjil' CHECK (semester IN ('Ganjil', 'Genap')),
+  tp TEXT CHECK (tp IN ('TP1', 'TP2', 'TP3', 'TP4')),
+  kategori TEXT NOT NULL DEFAULT 'Tugas' CHECK (kategori IN ('Tugas', 'Ulangan Harian', 'UTS', 'UAS', 'Praktik')),
   deadline TIMESTAMPTZ NOT NULL,
   created_by UUID REFERENCES profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -98,6 +101,7 @@ CREATE TABLE nilai (
   nama_kelas TEXT NOT NULL,
   mapel TEXT NOT NULL DEFAULT 'Sejarah' CHECK (mapel IN ('Sejarah', 'STL')),
   semester TEXT NOT NULL CHECK (semester IN ('Ganjil', 'Genap')),
+  tp TEXT CHECK (tp IN ('TP1', 'TP2', 'TP3', 'TP4')),
   kategori TEXT NOT NULL DEFAULT 'Ulangan Harian',
   judul TEXT NOT NULL,
   nilai DECIMAL(5,2) NOT NULL CHECK (nilai >= 0 AND nilai <= 100),
@@ -121,7 +125,7 @@ CREATE TABLE dokumen_guru (
   mapel TEXT NOT NULL DEFAULT 'Sejarah' CHECK (mapel IN ('Sejarah', 'STL')),
   semester TEXT NOT NULL CHECK (semester IN ('Ganjil', 'Genap')),
   tahun_ajaran TEXT NOT NULL,
-  tp TEXT CHECK (tp IN ('TP1', 'TP2', 'TP3')),
+  tp TEXT CHECK (tp IN ('TP1', 'TP2', 'TP3', 'TP4')),
   created_by UUID REFERENCES profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

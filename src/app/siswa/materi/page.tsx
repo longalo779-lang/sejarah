@@ -98,6 +98,8 @@ export default function SiswaMateriPage() {
                             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                                 <span className="badge badge-primary">{m.nama_kelas}</span>
                                 <span className="badge badge-info">{m.mapel}</span>
+                                {(m as any).semester && <span className="badge badge-warning">Smt {(m as any).semester}</span>}
+                                {(m as any).tp && <span className="badge badge-success">{(m as any).tp}</span>}
                             </div>
                             {m.deskripsi && <p style={{ fontSize: '0.85rem', color: 'var(--neutral-500)', marginBottom: '0.75rem' }}>{m.deskripsi}</p>}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>

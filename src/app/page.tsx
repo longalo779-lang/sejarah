@@ -64,7 +64,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'url(/bg-hero.jpg) center/cover no-repeat fixed',
+        background: 'url(/tampilan-utama.jpeg) center/cover no-repeat fixed',
         position: 'relative', textAlign: 'center', padding: '2rem',
       }}>
         <div style={{

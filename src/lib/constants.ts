@@ -1,4 +1,17 @@
 // ============================================
+// Validasi Registrasi Guru
+// ============================================
+
+// Daftar NIP yang diizinkan untuk registrasi guru
+export const ALLOWED_NIP_LIST: string[] = [
+    '197802152009012001',
+    // Tambahkan NIP guru lainnya di sini
+]
+
+// Kode akses untuk guru yang tidak memiliki NIP
+export const GURU_ACCESS_CODE = 'GURU-SMANSA-2026'
+
+// ============================================
 // Kelas & Mapel Constants
 // ============================================
 
@@ -28,6 +41,13 @@ export const MAPEL_OPTIONS = [
 export const SEMESTER_OPTIONS = [
     { value: 'Ganjil', label: 'Ganjil' },
     { value: 'Genap', label: 'Genap' },
+]
+
+export const TP_OPTIONS = [
+    { value: 'TP1', label: 'TP 1' },
+    { value: 'TP2', label: 'TP 2' },
+    { value: 'TP3', label: 'TP 3' },
+    { value: 'TP4', label: 'TP 4' },
 ]
 
 /**

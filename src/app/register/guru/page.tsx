@@ -3,12 +3,15 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { GraduationCap, UserPlus, Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
+import { GraduationCap, UserPlus, Eye, EyeOff, ArrowLeft, ShieldCheck, KeyRound } from 'lucide-react'
 import Link from 'next/link'
+import { ALLOWED_NIP_LIST, GURU_ACCESS_CODE } from '@/lib/constants'
 
 export default function RegisterGuruPage() {
     const [nama, setNama] = useState('')
     const [nip, setNip] = useState('')
+    const [kodeAkses, setKodeAkses] = useState('')
+    const [tanpaNip, setTanpaNip] = useState(false)
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
@@ -34,6 +37,23 @@ export default function RegisterGuruPage() {
         if (!nama.trim()) {
             setError('Nama lengkap wajib diisi')
             return
+        }
+
+        // Validasi NIP atau Kode Akses
+        if (tanpaNip) {
+            if (kodeAkses.trim() !== GURU_ACCESS_CODE) {
+                setError('Kode akses tidak valid. Hubungi admin untuk mendapatkan kode akses.')
+                return
+            }
+        } else {
+            if (!nip.trim()) {
+                setError('NIP wajib diisi')
+                return
+            }
+            if (!ALLOWED_NIP_LIST.includes(nip.trim())) {
+                setError('NIP tidak terdaftar dalam sistem. Pastikan NIP Anda benar atau gunakan kode akses.')
+                return
+            }
         }
 
         setLoading(true)
@@ -119,7 +139,7 @@ export default function RegisterGuruPage() {
                     border: '1px solid var(--primary-200)',
                 }}>
                     <ShieldCheck size={16} style={{ flexShrink: 0 }} />
-                    Halaman registrasi khusus untuk Guru Sejarah
+                    Registrasi memerlukan NIP valid atau kode akses dari admin
                 </div>
 
                 <form onSubmit={handleRegister}>
@@ -141,12 +161,40 @@ export default function RegisterGuruPage() {
                             value={nama} onChange={(e) => setNama(e.target.value)} required />
                     </div>
 
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="nip">NIP (opsional)</label>
-                        <input id="nip" type="text" className="form-input"
-                            placeholder="Nomor Induk Pegawai"
-                            value={nip} onChange={(e) => setNip(e.target.value)} />
+                    {/* Toggle NIP / Kode Akses */}
+                    <div style={{
+                        display: 'flex', gap: '0.5rem', marginBottom: '0.75rem',
+                    }}>
+                        <button type="button" onClick={() => setTanpaNip(false)}
+                            className={`btn ${!tanpaNip ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem' }}>
+                            Punya NIP
+                        </button>
+                        <button type="button" onClick={() => setTanpaNip(true)}
+                            className={`btn ${tanpaNip ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem' }}>
+                            <KeyRound size={14} /> Kode Akses
+                        </button>
                     </div>
+
+                    {!tanpaNip ? (
+                        <div className="form-group">
+                            <label className="form-label" htmlFor="nip">NIP</label>
+                            <input id="nip" type="text" className="form-input"
+                                placeholder="Masukkan NIP (wajib)"
+                                value={nip} onChange={(e) => setNip(e.target.value)} required />
+                        </div>
+                    ) : (
+                        <div className="form-group">
+                            <label className="form-label" htmlFor="kodeAkses">Kode Akses</label>
+                            <input id="kodeAkses" type="text" className="form-input"
+                                placeholder="Masukkan kode akses dari admin"
+                                value={kodeAkses} onChange={(e) => setKodeAkses(e.target.value)} required />
+                            <p style={{ fontSize: '0.75rem', color: 'var(--neutral-400)', marginTop: '0.25rem' }}>
+                                Hubungi admin untuk mendapatkan kode akses
+                            </p>
+                        </div>
+                    )}
 
                     <div className="form-group">
                         <label className="form-label" htmlFor="email">Email</label>
