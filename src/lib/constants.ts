@@ -5,11 +5,14 @@
 // Daftar NIP yang diizinkan untuk registrasi guru
 export const ALLOWED_NIP_LIST: string[] = [
     '197802152009012001',
+    '199409102019032018',
+    '196908172014082001',
+    '199105182023212040',
     // Tambahkan NIP guru lainnya di sini
 ]
 
 // Kode akses untuk guru yang tidak memiliki NIP
-export const GURU_ACCESS_CODE = 'GURU-SMANSA-2026'
+export const GURU_ACCESS_CODE = '969'
 
 // ============================================
 // Kelas & Mapel Constants
