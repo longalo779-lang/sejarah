@@ -67,6 +67,7 @@ export default function RegisterGuruPage() {
                         nama: nama.trim(),
                         role: 'guru',
                         nis: nip.trim() || null,
+                        nip: nip.trim() || null,
                     },
                 },
             })

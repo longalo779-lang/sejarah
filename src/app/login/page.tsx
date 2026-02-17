@@ -76,47 +76,20 @@ export default function LoginPage() {
                     return
                 }
 
+                // Cari email guru dari tabel profiles berdasarkan NIP
                 const { data: profile, error: profileError } = await supabase
                     .from('profiles')
-                    .select('id, nis')
-                    .eq('nis', nip.trim())
+                    .select('email')
+                    .or(`nis.eq.${nip.trim()},nip.eq.${nip.trim()}`)
                     .eq('role', 'guru')
                     .single()
 
-                if (profileError || !profile) {
+                if (profileError || !profile || !profile.email) {
                     setError('NIP tidak ditemukan. Pastikan NIP Anda sudah terdaftar.')
                     return
                 }
 
-                // Dapatkan email dari auth.users melalui profile id
-                const { data: userData } = await supabase.auth.admin?.getUserById?.(profile.id) || {}
-
-                // Karena client-side tidak bisa akses admin API, kita cari email lewat tabel profiles
-                // Alternatif: simpan email di profiles atau gunakan RPC
-                // Untuk sekarang gunakan lookup dari profiles
-                const { data: profileWithEmail } = await supabase
-                    .from('profiles')
-                    .select('id')
-                    .eq('nis', nip.trim())
-                    .eq('role', 'guru')
-                    .single()
-
-                if (!profileWithEmail) {
-                    setError('Akun guru dengan NIP tersebut tidak ditemukan.')
-                    return
-                }
-
-                // Kita perlu email untuk login. Cari dari auth metadata.
-                // Workaround: coba semua kemungkinan - gunakan RPC function
-                const { data: emailData, error: rpcError } = await supabase
-                    .rpc('get_email_by_nip', { nip_input: nip.trim() })
-
-                if (rpcError || !emailData) {
-                    setError('Tidak dapat menemukan email untuk NIP ini. Hubungi administrator.')
-                    return
-                }
-
-                await loginWithEmail(emailData)
+                await loginWithEmail(profile.email)
 
             } else if (mode === 'guru-email') {
                 // Guru tanpa NIP: login dengan email + kode akses + password
