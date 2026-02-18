@@ -79,7 +79,19 @@ export default function LoginPage() {
                 const { data: emailResult, error: rpcError } = await supabase
                     .rpc('get_email_by_nip', { nip_input: nip.trim() })
 
-                if (rpcError || !emailResult) {
+                console.log('RPC result:', { emailResult, rpcError })
+
+                if (rpcError) {
+                    console.error('RPC error:', rpcError)
+                    if (rpcError.message?.includes('function') || rpcError.code === '42883') {
+                        setError('Fungsi lookup NIP belum tersedia. Hubungi administrator.')
+                    } else {
+                        setError('NIP tidak ditemukan. Pastikan NIP Anda sudah terdaftar.')
+                    }
+                    return
+                }
+
+                if (!emailResult) {
                     setError('NIP tidak ditemukan. Pastikan NIP Anda sudah terdaftar.')
                     return
                 }
