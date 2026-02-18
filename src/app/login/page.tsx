@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { BookOpen, Eye, EyeOff, LogIn, GraduationCap, Users, KeyRound } from 'lucide-react'
+import { Eye, EyeOff, LogIn, GraduationCap, Users, KeyRound } from 'lucide-react'
 import Link from 'next/link'
 import { GURU_ACCESS_CODE } from '@/lib/constants'
 
@@ -70,26 +70,21 @@ export default function LoginPage() {
                 await loginWithEmail(email)
 
             } else if (mode === 'guru-nip') {
-                // Guru dengan NIP: cari email via API route (server-side bypasses RLS)
+                // Guru dengan NIP: cari email via RPC function (SECURITY DEFINER bypasses RLS)
                 if (!nip.trim()) {
                     setError('NIP wajib diisi')
                     return
                 }
 
-                const res = await fetch('/api/lookup-nip', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nip: nip.trim() }),
-                })
+                const { data: emailResult, error: rpcError } = await supabase
+                    .rpc('get_email_by_nip', { nip_input: nip.trim() })
 
-                const result = await res.json()
-
-                if (!res.ok || !result.email) {
-                    setError(result.error || 'NIP tidak ditemukan. Pastikan NIP Anda sudah terdaftar.')
+                if (rpcError || !emailResult) {
+                    setError('NIP tidak ditemukan. Pastikan NIP Anda sudah terdaftar.')
                     return
                 }
 
-                await loginWithEmail(result.email)
+                await loginWithEmail(emailResult)
 
             } else if (mode === 'guru-email') {
                 // Guru tanpa NIP: login dengan email + kode akses + password
@@ -102,7 +97,6 @@ export default function LoginPage() {
                     return
                 }
 
-                // Verifikasi bahwa email ini milik guru
                 await loginWithEmail(email)
             }
         } catch (err: unknown) {
