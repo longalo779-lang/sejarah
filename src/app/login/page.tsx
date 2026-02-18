@@ -70,26 +70,26 @@ export default function LoginPage() {
                 await loginWithEmail(email)
 
             } else if (mode === 'guru-nip') {
-                // Guru dengan NIP: cari email dari profiles berdasarkan NIP
+                // Guru dengan NIP: cari email via API route (server-side bypasses RLS)
                 if (!nip.trim()) {
                     setError('NIP wajib diisi')
                     return
                 }
 
-                // Cari email guru dari tabel profiles berdasarkan NIP
-                const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('email')
-                    .or(`nis.eq.${nip.trim()},nip.eq.${nip.trim()}`)
-                    .eq('role', 'guru')
-                    .single()
+                const res = await fetch('/api/lookup-nip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nip: nip.trim() }),
+                })
 
-                if (profileError || !profile || !profile.email) {
-                    setError('NIP tidak ditemukan. Pastikan NIP Anda sudah terdaftar.')
+                const result = await res.json()
+
+                if (!res.ok || !result.email) {
+                    setError(result.error || 'NIP tidak ditemukan. Pastikan NIP Anda sudah terdaftar.')
                     return
                 }
 
-                await loginWithEmail(profile.email)
+                await loginWithEmail(result.email)
 
             } else if (mode === 'guru-email') {
                 // Guru tanpa NIP: login dengan email + kode akses + password
